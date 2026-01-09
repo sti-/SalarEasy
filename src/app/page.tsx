@@ -11,7 +11,7 @@ import { getEmployees, saveEmployees, getLegalSettings, getWorkingDays, type Emp
 const DYNAMIC_COLUMN_COUNT = 35;
 const COLUMNS_PER_PAGE = 5;     // number of non-frozen columns per page
 
-export default function Home(): JSX.Element {
+export default function Home() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [editingCell, setEditingCell] = useState<{ id: number; field: string } | null>(null);
   const [editValue, setEditValue] = useState<string>('');
