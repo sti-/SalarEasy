@@ -1,3 +1,4 @@
+//please ignore this comment
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -223,7 +224,10 @@ export default function Home() {
               numericValue = 0;
             }
           }
-          updated[editingCell.field as keyof Employee] = numericValue as any;
+          // Type-safe assignment for numeric fields
+          // We know editingCell.field is a numeric field at this point, so we can safely assign
+          // Using type assertion to handle dynamic property assignment
+          (updated as any)[editingCell.field] = numericValue;
 
           // When VALOARE TICHET DE MASA is input, auto-update ticheteDeMasa
           if (editingCell.field === 'valoareTichetDeMasa') {
