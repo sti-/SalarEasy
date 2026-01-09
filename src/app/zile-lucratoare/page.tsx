@@ -3,12 +3,6 @@
 import { useState, useEffect } from 'react';
 import { getWorkingDays, saveWorkingDays, type WorkingDaysData } from '../../lib/db';
 
-interface WorkingDaysData {
-  [year: string]: {
-    [month: number]: number;
-  };
-}
-
 const MONTHS = [
   { month: 1, name: 'Ianuarie' },
   { month: 2, name: 'Februarie' },
