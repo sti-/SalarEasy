@@ -9,7 +9,7 @@ interface AttributeHistory {
   endDate: string | null;
 }
 
-const DEFAULT_VALUES = {
+const DEFAULT_VALUES: Record<string, number> = {
   'Salariul minim pe economie': 4050,
   'Valoare tichet de masa - default clienti BONO': 40,
   'Deducere / minor in intretinere': 100,
