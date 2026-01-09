@@ -9,15 +9,6 @@ interface AttributeHistory {
   endDate: string | null;
 }
 
-interface AttributeData {
-  currentValue: number;
-  history: AttributeHistory[];
-}
-
-interface LegalSettings {
-  [key: string]: AttributeData;
-}
-
 const DEFAULT_VALUES = {
   'Salariul minim pe economie': 4050,
   'Valoare tichet de masa - default clienti BONO': 40,
