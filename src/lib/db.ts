@@ -200,6 +200,25 @@ export async function addEmployee(employee: Employee): Promise<boolean> {
   return true;
 }
 
+export async function deleteEmployee(id: number): Promise<boolean> {
+  if (!checkSupabaseConfig()) {
+    console.error('Supabase not configured. Cannot delete employee.');
+    return false;
+  }
+
+  const { error } = await supabase
+    .from('employees')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error deleting employee:', error);
+    return false;
+  }
+
+  return true;
+}
+
 // Legal Settings
 export async function getLegalSettings(): Promise<LegalSettings> {
   if (!checkSupabaseConfig()) {

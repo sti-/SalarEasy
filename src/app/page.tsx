@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from "@/lib/supabase";
 import { lookupDeducerePercentage } from './utils/deducereLookup';
-import { getEmployees, saveEmployees, getLegalSettings, getWorkingDays, type Employee, type LegalSettings, type WorkingDaysData } from '../lib/db';
+import { getEmployees, saveEmployees, deleteEmployee, getLegalSettings, getWorkingDays, type Employee, type LegalSettings, type WorkingDaysData } from '../lib/db';
 
 // Number of non-frozen (scrollable/paged) columns that exist in total.
 // Currently we have 6 real dynamic column pages plus 1 empty page at the start,
@@ -29,6 +29,7 @@ export default function Home() {
   const [cotaImpozit, setCotaImpozit] = useState<number>(0.10);
   const [camValue, setCamValue] = useState<number>(0.0225);
   const [columnPage, setColumnPage] = useState(0);
+  const [deleteConfirmEmployee, setDeleteConfirmEmployee] = useState<Employee | null>(null);
 
   // Current month (Romanian) and year, to be reused in further logic
   const MONTHS_RO = [
@@ -306,6 +307,28 @@ export default function Home() {
     setEditValue('');
   };
 
+  const handleDeleteClick = (employee: Employee) => {
+    setDeleteConfirmEmployee(employee);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirmEmployee) return;
+
+    const success = await deleteEmployee(deleteConfirmEmployee.id);
+    if (success) {
+      // Remove from local state
+      const updatedEmployees = employees.filter(emp => emp.id !== deleteConfirmEmployee.id);
+      setEmployees(updatedEmployees);
+    } else {
+      alert('Eroare la stergerea angajatului. Te rog incearca din nou.');
+    }
+    setDeleteConfirmEmployee(null);
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirmEmployee(null);
+  };
+
   return (
     <main style={{
       padding: '40px',
@@ -484,6 +507,19 @@ export default function Home() {
               borderBottom: '2px solid #e0e0e0'
             }}>
               <th style={{
+                padding: '16px 12px',
+                textAlign: 'center',
+                fontWeight: '600',
+                color: '#333',
+                fontSize: '14px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                borderRight: '2px solid #e0e0e0',
+                width: '60px'
+              }}>
+                {/* Delete column */}
+              </th>
+              <th style={{
                 padding: '16px 24px',
                 textAlign: 'left',
                 fontWeight: '600',
@@ -591,7 +627,7 @@ export default function Home() {
               <tr style={{
                 borderBottom: '1px solid #f0f0f0'
               }}>
-                <td colSpan={9} style={{
+                <td colSpan={10} style={{
                   padding: '40px',
                   textAlign: 'center',
                   color: '#808080',
@@ -621,6 +657,50 @@ export default function Home() {
                       backgroundColor: index % 2 === 0 ? '#ffffff' : '#fafafa'
                     }}
                   >
+                    <td style={{
+                      padding: '16px 12px',
+                      textAlign: 'center',
+                      borderRight: '2px solid #e0e0e0'
+                    }}>
+                      <button
+                        onClick={() => handleDeleteClick(employee)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#d32f2f',
+                          transition: 'color 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = '#b71c1c';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color = '#d32f2f';
+                        }}
+                        title="Sterge angajat"
+                      >
+                        <svg
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M3 6h18" />
+                          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                          <line x1="10" y1="11" x2="10" y2="17" />
+                          <line x1="14" y1="11" x2="14" y2="17" />
+                        </svg>
+                      </button>
+                    </td>
                     <td style={{
                       padding: '16px 24px',
                       color: '#333',
@@ -2374,6 +2454,102 @@ export default function Home() {
           </tbody>
         </table>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmEmployee && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}
+        onClick={handleDeleteCancel}
+        >
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            padding: '32px',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{
+              fontSize: '20px',
+              fontWeight: '600',
+              marginBottom: '24px',
+              color: '#1a1a1a'
+            }}>
+              Confirmare stergere
+            </h2>
+            <p style={{
+              fontSize: '16px',
+              color: '#333',
+              marginBottom: '32px',
+              lineHeight: '1.5'
+            }}>
+              Esti sigur ca vrei sa stergi acest angajat?
+            </p>
+            <div style={{
+              display: 'flex',
+              gap: '12px',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={handleDeleteCancel}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#f5f5f5',
+                  color: '#333',
+                  border: '1px solid #ddd',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#e0e0e0';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f5f5f5';
+                }}
+              >
+                NU
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#d32f2f',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#b71c1c';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#d32f2f';
+                }}
+              >
+                DA
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
