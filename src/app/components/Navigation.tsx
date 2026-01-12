@@ -12,6 +12,7 @@ export default function Navigation() {
     { href: '/settings', label: 'Setari legale' },
     { href: '/zile-lucratoare', label: 'Zile lucratoare' },
     { href: '/deducere-personala-oug-16-2022', label: 'Deducere personala - OUG 16/2022' },
+    { href: '/tac-uri', label: 'TAC-uri' },
   ];
 
   const isActive = (href: string) => {

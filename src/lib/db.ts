@@ -515,3 +515,601 @@ export async function saveWorkingDays(workingDays: WorkingDaysData): Promise<boo
     return false;
   }
 }
+
+// TAC (Transaction Allocation Template) interfaces and functions
+export interface TAC {
+  id: number;
+  name: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface TACRow {
+  id: number;
+  tacId: number;
+  fisaCont: string;
+  contCorespondent?: string;
+  debitFormula?: string;
+  creditFormula?: string;
+  valutaFormula?: string;
+  monedaValutaFormula?: string;
+  rowOrder: number;
+}
+
+export interface Transaction {
+  id: number;
+  tacId?: number;
+  transactionDate: string;
+  description?: string;
+  variables: Record<string, any>;
+}
+
+export interface AccountFileEntry {
+  id: number;
+  transactionId: number;
+  fisaCont: string;
+  contCorespondent?: string;
+  debit: number;
+  credit: number;
+  valuta?: number;
+  monedaValuta?: string;
+}
+
+// TAC Functions
+export async function getTACs(): Promise<TAC[]> {
+  if (!checkSupabaseConfig()) {
+    return [];
+  }
+  
+  try {
+    const { data, error } = await supabase
+      .from('tacs')
+      .select('*')
+      .order('id', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching TACs:', error);
+      return [];
+    }
+
+    if (!data) return [];
+
+    return data.map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
+  } catch (err) {
+    console.error('Unexpected error fetching TACs:', err);
+    return [];
+  }
+}
+
+export async function getTACById(id: number): Promise<TAC | null> {
+  if (!checkSupabaseConfig()) {
+    return null;
+  }
+  
+  try {
+    const { data, error } = await supabase
+      .from('tacs')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      console.error('Error fetching TAC:', error);
+      return null;
+    }
+
+    if (!data) return null;
+
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
+  } catch (err) {
+    console.error('Unexpected error fetching TAC:', err);
+    return null;
+  }
+}
+
+export async function getTACRows(tacId: number): Promise<TACRow[]> {
+  if (!checkSupabaseConfig()) {
+    return [];
+  }
+  
+  try {
+    const { data, error } = await supabase
+      .from('tac_rows')
+      .select('*')
+      .eq('tac_id', tacId)
+      .order('row_order', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching TAC rows:', error);
+      return [];
+    }
+
+    if (!data) return [];
+
+    return data.map((row: any) => ({
+      id: row.id,
+      tacId: row.tac_id,
+      fisaCont: row.fisa_cont,
+      contCorespondent: row.cont_corespondent,
+      debitFormula: row.debit_formula,
+      creditFormula: row.credit_formula,
+      valutaFormula: row.valuta_formula,
+      monedaValutaFormula: row.moneda_valuta_formula,
+      rowOrder: row.row_order
+    }));
+  } catch (err) {
+    console.error('Unexpected error fetching TAC rows:', err);
+    return [];
+  }
+}
+
+export async function saveTAC(tac: Omit<TAC, 'id' | 'createdAt' | 'updatedAt'>, rows: Omit<TACRow, 'id' | 'tacId'>[]): Promise<number | null> {
+  if (!checkSupabaseConfig()) {
+    console.error('Supabase not configured. Cannot save TAC.');
+    return null;
+  }
+
+  try {
+    // Validate input
+    if (!tac.name || tac.name.trim() === '') {
+      console.error('Error saving TAC: TAC name is required');
+      return null;
+    }
+
+    // Insert or update TAC
+    const tacData = {
+      name: tac.name.trim(),
+      description: tac.description ? tac.description.trim() : null
+    };
+
+    const { data: tacResult, error: tacError } = await supabase
+      .from('tacs')
+      .insert([tacData])
+      .select()
+      .single();
+
+    if (tacError) {
+      console.error('Error saving TAC:', {
+        error: tacError,
+        message: tacError?.message || 'No message',
+        code: tacError?.code || 'No code',
+        details: tacError?.details || 'No details',
+        hint: tacError?.hint || 'No hint',
+        fullError: JSON.stringify(tacError, null, 2)
+      });
+      return null;
+    }
+
+    if (!tacResult) {
+      console.error('Error saving TAC: No data returned from insert');
+      return null;
+    }
+
+    const tacId = tacResult.id;
+
+    // Delete existing rows
+    const { error: deleteError } = await supabase
+      .from('tac_rows')
+      .delete()
+      .eq('tac_id', tacId);
+
+    if (deleteError) {
+      console.error('Error deleting existing TAC rows:', deleteError);
+    }
+
+    // Insert new rows
+    if (rows.length > 0) {
+      const rowsData = rows.map((row, index) => ({
+        tac_id: tacId,
+        fisa_cont: row.fisaCont,
+        cont_corespondent: row.contCorespondent || null,
+        debit_formula: row.debitFormula || null,
+        credit_formula: row.creditFormula || null,
+        valuta_formula: row.valutaFormula || null,
+        moneda_valuta_formula: row.monedaValutaFormula || null,
+        row_order: row.rowOrder !== undefined ? row.rowOrder : index
+      }));
+
+      const { error: rowsError } = await supabase
+        .from('tac_rows')
+        .insert(rowsData);
+
+      if (rowsError) {
+        console.error('Error saving TAC rows:', {
+          error: rowsError,
+          message: rowsError?.message || 'No message',
+          code: rowsError?.code || 'No code',
+          details: rowsError?.details || 'No details',
+          hint: rowsError?.hint || 'No hint',
+          fullError: JSON.stringify(rowsError, null, 2),
+          attemptedRows: rowsData.slice(0, 3) // Show first 3 rows for debugging
+        });
+        return null;
+      }
+    }
+
+    return tacId;
+  } catch (err) {
+    console.error('Unexpected error saving TAC:', err);
+    return null;
+  }
+}
+
+export async function updateTAC(id: number, tac: Omit<TAC, 'id' | 'createdAt' | 'updatedAt'>, rows: Omit<TACRow, 'id' | 'tacId'>[]): Promise<boolean> {
+  if (!checkSupabaseConfig()) {
+    return false;
+  }
+
+  try {
+    // Update TAC
+    const tacData = {
+      name: tac.name,
+      description: tac.description || null
+    };
+
+    const { error: tacError } = await supabase
+      .from('tacs')
+      .update(tacData)
+      .eq('id', id);
+
+    if (tacError) {
+      console.error('Error updating TAC:', {
+        error: tacError,
+        message: tacError?.message || 'No message',
+        code: tacError?.code || 'No code',
+        details: tacError?.details || 'No details',
+        hint: tacError?.hint || 'No hint',
+        fullError: JSON.stringify(tacError, null, 2)
+      });
+      return false;
+    }
+
+    // Delete existing rows
+    const { error: deleteError } = await supabase
+      .from('tac_rows')
+      .delete()
+      .eq('tac_id', id);
+
+    if (deleteError) {
+      console.error('Error deleting existing TAC rows:', {
+        error: deleteError,
+        message: deleteError?.message || 'No message',
+        code: deleteError?.code || 'No code',
+        details: deleteError?.details || 'No details',
+        hint: deleteError?.hint || 'No hint'
+      });
+      // Continue anyway - might be able to insert new rows
+    }
+
+    // Insert new rows
+    if (rows.length > 0) {
+      const rowsData = rows.map((row, index) => ({
+        tac_id: id,
+        fisa_cont: row.fisaCont,
+        cont_corespondent: row.contCorespondent || null,
+        debit_formula: row.debitFormula || null,
+        credit_formula: row.creditFormula || null,
+        valuta_formula: row.valutaFormula || null,
+        moneda_valuta_formula: row.monedaValutaFormula || null,
+        row_order: row.rowOrder !== undefined ? row.rowOrder : index
+      }));
+
+      const { error: rowsError } = await supabase
+        .from('tac_rows')
+        .insert(rowsData);
+
+      if (rowsError) {
+        console.error('Error saving TAC rows:', {
+          error: rowsError,
+          message: rowsError?.message || 'No message',
+          code: rowsError?.code || 'No code',
+          details: rowsError?.details || 'No details',
+          hint: rowsError?.hint || 'No hint',
+          fullError: JSON.stringify(rowsError, null, 2),
+          attemptedRows: rowsData.slice(0, 3) // Show first 3 rows for debugging
+        });
+        return false;
+      }
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Unexpected error updating TAC:', err);
+    if (err instanceof Error) {
+      console.error('Error message:', err.message);
+      console.error('Error stack:', err.stack);
+    }
+    return false;
+  }
+}
+
+export async function deleteTAC(id: number): Promise<boolean> {
+  if (!checkSupabaseConfig()) {
+    return false;
+  }
+
+  const { error } = await supabase
+    .from('tacs')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error deleting TAC:', error);
+    return false;
+  }
+
+  return true;
+}
+
+// Transaction Functions
+export async function getTransactions(): Promise<Transaction[]> {
+  if (!checkSupabaseConfig()) {
+    return [];
+  }
+  
+  try {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .order('transaction_date', { ascending: false });
+
+    if (error) {
+      // Check if table doesn't exist
+      const errorMessage = error.message || String(error);
+      const errorCode = error.code || '';
+      
+      if (errorCode === 'PGRST116' || errorCode === '42P01' || errorMessage?.includes('relation') || errorMessage?.includes('does not exist')) {
+        console.warn('Transactions table does not exist yet. Please run the SQL schema in Supabase.');
+        return [];
+      }
+      
+      console.error('Error fetching transactions:', {
+        error: error,
+        message: error?.message || 'No message',
+        code: error?.code || 'No code',
+        details: error?.details || 'No details',
+        hint: error?.hint || 'No hint',
+        fullError: JSON.stringify(error, null, 2)
+      });
+      return [];
+    }
+
+    if (!data) return [];
+
+    return data.map((row: any) => ({
+      id: row.id,
+      tacId: row.tac_id,
+      transactionDate: row.transaction_date,
+      description: row.description,
+      variables: row.variables || {}
+    }));
+  } catch (err) {
+    console.error('Unexpected error fetching transactions:', err);
+    return [];
+  }
+}
+
+export async function saveTransaction(transaction: Omit<Transaction, 'id'>): Promise<number | null> {
+  if (!checkSupabaseConfig()) {
+    return null;
+  }
+
+  try {
+    const transactionData = {
+      tac_id: transaction.tacId || null,
+      transaction_date: transaction.transactionDate,
+      description: transaction.description || null,
+      variables: transaction.variables || {}
+    };
+
+    const { data, error } = await supabase
+      .from('transactions')
+      .insert([transactionData])
+      .select()
+      .single();
+
+    if (error) {
+      // Check if table doesn't exist
+      const errorMessage = error.message || String(error);
+      const errorCode = error.code || '';
+      
+      if (errorCode === 'PGRST116' || errorCode === '42P01' || errorMessage?.includes('relation') || errorMessage?.includes('does not exist')) {
+        console.error('Transactions table does not exist. Please run the SQL schema in Supabase to create the tables.');
+        return null;
+      }
+      
+      console.error('Error saving transaction:', {
+        error: error,
+        message: error?.message || 'No message',
+        code: error?.code || 'No code',
+        details: error?.details || 'No details',
+        hint: error?.hint || 'No hint',
+        fullError: JSON.stringify(error, null, 2)
+      });
+      return null;
+    }
+
+    return data?.id || null;
+  } catch (err) {
+    console.error('Unexpected error saving transaction:', err);
+    return null;
+  }
+}
+
+export async function saveTransactionsBulk(transactions: Omit<Transaction, 'id'>[]): Promise<number[]> {
+  if (!checkSupabaseConfig()) {
+    return [];
+  }
+
+  try {
+    const transactionData = transactions.map(t => ({
+      tac_id: t.tacId || null,
+      transaction_date: t.transactionDate,
+      description: t.description || null,
+      variables: t.variables || {}
+    }));
+
+    const { data, error } = await supabase
+      .from('transactions')
+      .insert(transactionData)
+      .select('id');
+
+    if (error) {
+      console.error('Error saving transactions:', error);
+      return [];
+    }
+
+    return data?.map(row => row.id) || [];
+  } catch (err) {
+    console.error('Unexpected error saving transactions:', err);
+    return [];
+  }
+}
+
+export async function getTACByName(name: string): Promise<TAC | null> {
+  if (!checkSupabaseConfig()) {
+    return null;
+  }
+  
+  try {
+    const { data, error } = await supabase
+      .from('tacs')
+      .select('*')
+      .eq('name', name)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No rows returned - this is not an error, just means TAC doesn't exist
+        return null;
+      }
+      console.error('Error fetching TAC by name:', {
+        error: error,
+        message: error?.message || 'No message',
+        code: error?.code || 'No code',
+        details: error?.details || 'No details',
+        hint: error?.hint || 'No hint',
+        fullError: JSON.stringify(error, null, 2),
+        searchedName: name
+      });
+      return null;
+    }
+
+    if (!data) return null;
+
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
+  } catch (err) {
+    console.error('Unexpected error fetching TAC by name:', err);
+    return null;
+  }
+}
+
+export async function deleteTransaction(id: number): Promise<boolean> {
+  if (!checkSupabaseConfig()) {
+    return false;
+  }
+
+  const { error } = await supabase
+    .from('transactions')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error deleting transaction:', error);
+    return false;
+  }
+
+  return true;
+}
+
+// Account File Entry Functions
+export async function getAccountFileEntries(transactionId?: number): Promise<AccountFileEntry[]> {
+  if (!checkSupabaseConfig()) {
+    return [];
+  }
+  
+  try {
+    let query = supabase
+      .from('account_file_entries')
+      .select('*')
+      .order('fisa_cont', { ascending: true });
+
+    if (transactionId) {
+      query = query.eq('transaction_id', transactionId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching account file entries:', error);
+      return [];
+    }
+
+    if (!data) return [];
+
+    return data.map((row: any) => ({
+      id: row.id,
+      transactionId: row.transaction_id,
+      fisaCont: row.fisa_cont,
+      contCorespondent: row.cont_corespondent,
+      debit: parseFloat(row.debit) || 0,
+      credit: parseFloat(row.credit) || 0,
+      valuta: row.valuta ? parseFloat(row.valuta) : undefined,
+      monedaValuta: row.moneda_valuta
+    }));
+  } catch (err) {
+    console.error('Unexpected error fetching account file entries:', err);
+    return [];
+  }
+}
+
+export async function saveAccountFileEntries(entries: Omit<AccountFileEntry, 'id'>[]): Promise<boolean> {
+  if (!checkSupabaseConfig()) {
+    return false;
+  }
+
+  try {
+    const rowsData = entries.map(entry => ({
+      transaction_id: entry.transactionId,
+      fisa_cont: entry.fisaCont,
+      cont_corespondent: entry.contCorespondent || null,
+      debit: entry.debit,
+      credit: entry.credit,
+      valuta: entry.valuta || null,
+      moneda_valuta: entry.monedaValuta || null
+    }));
+
+    const { error } = await supabase
+      .from('account_file_entries')
+      .insert(rowsData);
+
+    if (error) {
+      console.error('Error saving account file entries:', error);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Unexpected error saving account file entries:', err);
+    return false;
+  }
+}
